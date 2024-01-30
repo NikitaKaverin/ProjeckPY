@@ -18,7 +18,12 @@ class DBManager:
         self.query(query)
 
     def select_active_message(self, id_message):
-        query = f'SELECT * FROM Messages WHERE id_message = "{id_message}" AND active = 1'
+        query = f'SELECT coin FROM Messages WHERE id_message = "{id_message}" AND active = 0'
+        self.cursor.execute(query)
+        return self.cursor.fetchone()
+
+    def select_active_hold(self, id_message):
+        query = f'SELECT deal_type FROM Messages WHERE id_message = "{id_message}" AND active = 0'
         self.cursor.execute(query)
         return self.cursor.fetchone()
 
