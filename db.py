@@ -18,12 +18,12 @@ class DBManager:
         self.query(query)
 
     def select_active_message(self, id_message):
-        query = f'SELECT coin FROM Messages WHERE id_message = "{id_message}" AND active = 0'
+        query = f'SELECT coin FROM Messages WHERE id_message = "{id_message}" AND active = 1'
         self.cursor.execute(query)
         return self.cursor.fetchone()
 
     def select_active_hold(self, id_message):
-        query = f'SELECT deal_type FROM Messages WHERE id_message = "{id_message}" AND active = 0'
+        query = f'SELECT deal_type FROM Messages WHERE id_message = "{id_message}" AND active = 1'
         self.cursor.execute(query)
         return self.cursor.fetchone()
 
@@ -31,5 +31,20 @@ class DBManager:
         query = f'UPDATE Messages SET active = 0 WHERE id_message = "{id_message}"'
         self.query(query)
 
+    def initDB(self):
+        self.cursor.execute("""CREATE TABLE IF NOT EXISTS Messages (
+        id INTEGER,
+        id_message TEXT NOT NULL,
+        datetime DATETIME,
+        coin TEXT,
+        deal_type TEXT,
+        active INTEGER
+        )""")
+
     def close(self):
         self.connection.close()
+
+
+if __name__ == '__main__':
+    db = DBManager()
+    db.initDB()
