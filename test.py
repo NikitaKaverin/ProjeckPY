@@ -23,21 +23,22 @@ client = TelegramClient('my_session', api_id, api_hash,
                         lang_code="en",
                         system_lang_code="en-US"
                         )
-peer_type = utils.resolve_id(-1001633253042)
+peer_type = utils.resolve_id(-1001781065102)
 print(peer_type)
 
-# async def main():
-#     # authentication
-#     await client.start(phone)
-#
-#     # get group and channel list
-#     dialogs = await client.get_dialogs()
-#
-#     # print group and channel data
-#     for dialog in dialogs:
-#         if dialog.is_group or dialog.is_channel:
-#             print(f"{dialog.name}: {dialog.id}")
-#
-#
-# # start
-# client.loop.run_until_complete(main())
+
+async def main():
+    # authentication
+    await client.start(phone)
+
+    # get group and channel list
+    dialogs = await client.get_dialogs()
+
+    # print group and channel data
+    for dialog in dialogs:
+        if dialog.is_group or dialog.is_channel:
+            print(f"{dialog.name}: {dialog.id}")
+
+
+# start
+client.loop.run_until_complete(main())
