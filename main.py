@@ -18,8 +18,6 @@ apiKey = os.getenv('BITGET_API_KEY')
 secretKey = os.getenv('BITGET_SECRET_KEY')
 passphrase = os.getenv('BITGET_PASSPHRASE')
 
-productType = "USDT-FUTURES"
-
 # Original
 # chat_id = 1633253042
 
@@ -49,7 +47,7 @@ def check_message(message):
     for x, word in enumerate(mes_arr):
         coin = db_manager.select_coin(word.replace("/", ""))
         if coin:
-            return ['deal', coin[0], mes_arr[x + 1], coin[1]]
+            return ['deal', coin['name'], mes_arr[x + 1], coin['maxLever']]
     return ['']
 
 
@@ -65,7 +63,7 @@ async def normal_handler(event):
                            mes_dict)
         coin.save()
     else:
-        print("Монеты нет в базе. Запустите refresh_coins.py")
+        print("No coin. Start refresh_coins.py")
 
 
 client.start()

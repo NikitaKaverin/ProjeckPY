@@ -27,12 +27,16 @@ for ticker in tickers["data"]:
 
     coin = db_manager.select_coin(ticker["symbol"])
 
-    if coin:
-        continue
-
     contract = api.get('/api/v2/mix/market/contracts', {
         'productType': productType,
         'symbol': ticker["symbol"]
     })
-    db_manager.add_coin(ticker["symbol"], contract["data"][0]["maxLever"])
-    print(ticker["symbol"], '-', contract["data"][0]["maxLever"], " - OK")
+
+    if coin:
+        if contract["data"][0]["maxLever"] == coin["maxLever"]:
+            continue
+        else:
+            db_manager.update_coin(ticker["symbol"], contract["data"][0]["maxLever"])
+    else:
+        db_manager.add_coin(ticker["symbol"], contract["data"][0]["maxLever"])
+    # print(ticker["symbol"], '-', contract["data"][0]["maxLever"], " - OK")
