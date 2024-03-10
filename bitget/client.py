@@ -48,15 +48,15 @@ class Client(object):
         response = None
         if method == c.GET:
             response = requests.get(url, headers=header)
-            print("response : ",response.text)
+            # print("response : ",response.text)
         elif method == c.POST:
             response = requests.post(url, data=body, headers=header)
-            print("response : ",response.text)
+            # print("response : ",response.text)
             #response = requests.post(url, json=body, headers=header)
         elif method == c.DELETE:
             response = requests.delete(url, headers=header)
 
-        print("status:", response.status_code)
+        # print("status:", response.status_code)
         # exception handle
         if not str(response.status_code).startswith('2'):
             raise exceptions.BitgetAPIException(response)
