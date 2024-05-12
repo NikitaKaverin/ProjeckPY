@@ -4,15 +4,11 @@ from dotenv import load_dotenv
 from telethon import events
 from telethon.sync import TelegramClient
 
-from db import DBManager
-
-from core.classes import FixMessage, CoinMessage
+from core.classes import MyAPI, DealMessage, DealFixMessage
 
 load_dotenv()
 api_id = int(os.getenv('TELEGRAM_ID'))
 api_hash = os.getenv('TELEGRAM_HASH')
-phone = '79878783869'
-time_sleep = 10
 
 apiKey = os.getenv('BITGET_API_KEY')
 secretKey = os.getenv('BITGET_SECRET_KEY')
@@ -22,12 +18,12 @@ passphrase = os.getenv('BITGET_PASSPHRASE')
 # chat_id = 1633253042
 
 # VIP
-chat_id = 1781065102
+# chat_id = 1781065102
 
 # TEST
-# chat_id = 1489990553
+chat_id = 1489990553
 
-db_manager = DBManager()
+api_manager = MyAPI(apiKey, secretKey, passphrase)
 
 client = TelegramClient('my_session', api_id, api_hash,
                         device_model="iPhone 14 Pro Max",
@@ -38,32 +34,67 @@ client = TelegramClient('my_session', api_id, api_hash,
                         )
 
 
-def check_message(message):
-    mes_arr = message['message'].split()
+def check_message(msg):
+    if msg.reply_to:
+        return {
+            'type': 'fix',
+            'reply_id': msg.reply_to.reply_to_msg_id
+        }
 
-    if message['reply_to'] is not None:
-        return ['fix', message['reply_to']['reply_to_msg_id']]
+    if 'СПОТ' in msg.message:
+        return {
+            'type': 'spot'
+        }
 
-    for x, word in enumerate(mes_arr):
-        coin = db_manager.select_coin(word.replace("/", ""))
-        if coin:
-            return ['deal', coin['name'], mes_arr[x + 1], coin['maxLever']]
-    return ['']
+    msg_arr = msg.message.split()
+    db_coin = DealMessage.select_coin(msg_arr[0].replace("/", ""))
+
+    if db_coin:
+        if 'LON' in msg.message:
+            hold_side = "LONG"
+            msg_deal_type = "BUY"
+        else:
+            hold_side = "SHORT"
+            msg_deal_type = "SELL"
+
+        deal_on_bitget = api_manager.get_single_position(db_coin['name'], hold_side)
+        deal_on_db = DealMessage.check_exist_deal(db_coin['name'], msg_deal_type)
+
+        if (deal_on_db == 1 and deal_on_bitget == 1) or (deal_on_db == 0 and deal_on_bitget == 1):
+            return {
+                'type': 'nothing'
+            }
+
+        return {
+            'type': 'deal',
+            'coin': db_coin['name'],
+            'hold_side': hold_side.lower(),
+            'deal_type': msg_deal_type,
+            'maxLever': db_coin['maxLever'],
+            'msg_id': msg.id,
+            'deal_on_db': deal_on_db,
+            'deal_on_bitget': deal_on_bitget
+        }
+
+    return {
+        'type': 'comment'
+    }
 
 
 @client.on(events.NewMessage(chats=[chat_id]))
 async def normal_handler(event):
-    mes_dict = event.message.to_dict()
-    checked_message = check_message(mes_dict)
-    if checked_message[0] == 'fix':
-        fix = FixMessage(checked_message[1])
-        fix.check_deal()
-    elif checked_message[0] == 'deal':
-        coin = CoinMessage(checked_message[1], 'SELL' if 'SHORT' in checked_message[2] else 'BUY', checked_message[3],
-                           mes_dict)
-        coin.save()
-    else:
-        print("No coin. Start refresh_coins.py")
+    checked_message = check_message(event.message)
+    msg_type = checked_message['type']
+    match msg_type:
+        case 'deal':
+            deal = DealMessage(checked_message)
+            deal.decide()
+        case 'fix':
+            fix = DealFixMessage(checked_message)
+            if fix.deal_on_db:
+                fix.decide()
+        case _:
+            print()
 
 
 client.start()
