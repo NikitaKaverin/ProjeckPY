@@ -10,35 +10,34 @@ from telethon.tl.types import InputPeerEmpty
 from telethon.sync import TelegramClient
 from telethon import utils
 
+from pprint import pprint
+
 load_dotenv()
 api_id = int(os.getenv('TELEGRAM_ID'))
 api_hash = os.getenv('TELEGRAM_HASH')
 phone = '79878783869'
 time_sleep = 10
+apiKey = os.getenv('BITGET_API_KEY')
+secretKey = os.getenv('BITGET_SECRET_KEY')
+passphrase = os.getenv('BITGET_PASSPHRASE')
 
-client = TelegramClient('my_session', api_id, api_hash,
-                        device_model="iPhone 13 Pro Max",
-                        system_version="14.8.1",
-                        app_version="8.4",
-                        lang_code="en",
-                        system_lang_code="en-US"
-                        )
-peer_type = utils.resolve_id(-1001781065102)
-print(peer_type)
+productType = "SUSDT-FUTURES"
+marginCoin = "SUSDT"
 
 
-async def main():
-    # authentication
-    await client.start(phone)
+coin = 'SBTCSUSDT'
+deal_type = 'short'
 
-    # get group and channel list
-    dialogs = await client.get_dialogs()
+api = baseApi.BitgetApi(apiKey, secretKey, passphrase)
+resPost = api.post("/api/v2/mix/order/place-tpsl-order", {
+    'marginCoin': marginCoin,
+    'productType': productType,
+    'symbol': coin,
+    'planType': 'profit_plan',
+    'triggerPrice': '68800',
+    'holdSide': deal_type,
+    'size': '0.062'
+})
+pprint(resPost)
 
-    # print group and channel data
-    for dialog in dialogs:
-        if dialog.is_group or dialog.is_channel:
-            print(f"{dialog.name}: {dialog.id}")
 
-
-# start
-client.loop.run_until_complete(main())
