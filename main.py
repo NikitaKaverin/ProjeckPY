@@ -1,10 +1,15 @@
 import os
+import json
+import warnings
 
+import telethon.types
 from dotenv import load_dotenv
 from telethon import events
 from telethon.sync import TelegramClient
 
 from core.classes import MyAPI, DealMessage, DealFixMessage
+
+warnings.filterwarnings("ignore")
 
 load_dotenv()
 api_id = int(os.getenv('TELEGRAM_ID'))
@@ -22,6 +27,9 @@ passphrase = os.getenv('BITGET_PASSPHRASE')
 
 # TEST
 chat_id = 1489990553
+
+# Check_Chat
+check_chat_id = 4282973738
 
 api_manager = MyAPI(apiKey, secretKey, passphrase)
 
@@ -57,7 +65,9 @@ def check_message(msg):
             hold_side = "SHORT"
             msg_deal_type = "SELL"
 
-        deal_on_bitget = api_manager.get_single_position(db_coin['name'], hold_side)
+        client.send_message(check_chat_id, msg.message)
+
+        deal_on_bitget = api_manager.get_single_position(db_coin['name'], hold_side)['exist']
         deal_on_db = DealMessage.check_exist_deal(db_coin['name'], msg_deal_type)
 
         if (deal_on_db == 1 and deal_on_bitget == 1) or (deal_on_db == 0 and deal_on_bitget == 1):
@@ -85,16 +95,16 @@ def check_message(msg):
 async def normal_handler(event):
     checked_message = check_message(event.message)
     msg_type = checked_message['type']
-    match msg_type:
-        case 'deal':
-            deal = DealMessage(checked_message)
-            deal.decide()
-        case 'fix':
-            fix = DealFixMessage(checked_message)
-            if fix.deal_on_db:
-                fix.decide()
-        case _:
-            print()
+    await client.send_message(telethon.types.PeerChat(check_chat_id), json.dumps(checked_message))
+    if msg_type == 'deal':
+        deal = DealMessage(checked_message)
+        deal.decide()
+    elif msg_type == 'fix':
+        fix = DealFixMessage(checked_message)
+        if fix.deal_on_db:
+            fix.decide()
+    else:
+        print()
 
 
 client.start()

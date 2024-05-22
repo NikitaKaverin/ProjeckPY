@@ -37,8 +37,8 @@ class MyAPI:
         deals = pos['data']
         for deal in deals:
             if deal['holdSide'] == deal_type.lower():
-                return 1
-        return 0
+                return {'exist': 1, 'pnl': float(deal['unrealizedPL'])}
+        return {'exist': 0}
 
     def get_margin_deal(self, coin):
         available_balance = self.api.get('/api/v2/mix/account/account', {
@@ -65,8 +65,19 @@ class MyAPI:
         })
         return message_leverage['msg'] == 'success'
 
-    def place_order(self, coin, size, deal_type):
+    def place_order(self, coin, size, deal_type, leverage, bid_price):
         client_oid = str(int(dt.timestamp(dt.now()) * 100000))
+
+        percent_pl = ((size / leverage) * 0.8 / leverage) / (size / leverage) * 100
+        percent_st = ((size / leverage) * 3 / leverage) / (size / leverage) * 100
+
+        if deal_type.lower() == 'sell':
+            pl_size = round(bid_price * (1 - percent_pl / 100), 1)
+            st_size = round(bid_price * (1 + percent_st / 100), 1)
+        else:
+            pl_size = round(bid_price * (1 + percent_pl / 100), 1)
+            st_size = round(bid_price * (1 - percent_st / 100), 1)
+
         res_post = self.api.post('/api/v2/mix/order/place-order', {
             "symbol": coin,
             "productType": productType,
@@ -77,6 +88,8 @@ class MyAPI:
             "tradeSide": "open",
             "orderType": "market",
             "force": "gtc",
+            "presetStopSurplusPrice": pl_size,
+            "presetStopLossPrice": st_size,
             "clientOid": client_oid  # придумываем самостоятельно
         })
         if res_post['msg'] == 'success':
@@ -100,28 +113,6 @@ class MyAPI:
             'clientOid': client_oid
         })
         return order['data']
-
-    def place_take_profit(self, coin, hold_side, pl_size):
-        res_post = self.api.post("/api/v2/mix/order/place-tpsl-order", {
-            'marginCoin': marginCoin,
-            'productType': productType,
-            'symbol': coin,
-            'planType': 'pos_profit',
-            'triggerPrice': pl_size,
-            'holdSide': hold_side
-        })
-        return res_post['msg'] == 'success'
-
-    def place_stop_loss(self, coin, hold_side, st_size):
-        res_post = self.api.post("/api/v2/mix/order/place-tpsl-order", {
-            'marginCoin': marginCoin,
-            'productType': productType,
-            'symbol': coin,
-            'planType': 'pos_loss',
-            'triggerPrice': st_size,
-            'holdSide': hold_side
-        })
-        return res_post['msg'] == 'success'
 
 
 class DealMessage:
@@ -148,33 +139,15 @@ class DealMessage:
             margin_deal = self.api.get_margin_deal(self.coin)
             bid_price = self.api.get_bid_price(self.coin)
             position_size = round((self.deal_max_lever * margin_deal / bid_price), 7)
-            order = self.api.place_order(self.coin, position_size, self.deal_type)
+            order = self.api.place_order(self.coin, position_size, self.deal_type, self.deal_max_lever, bid_price)
             if order:
                 print(f'SUCCESS - Create order in BitGet on coin: {self.coin}')
                 db_manager.save_deal(self.message_id, self.coin, self.deal_type, self.hold_side, order['orderId'],
                                      order['clientOid'])
-                self.place_tpsl(order)
             else:
                 print(f'ERROR - Can\'t place order on coin: {self.coin}')
         else:
             print(f'ERROR - Can\'t set leverage on coin: {self.coin}')
-
-    def place_tpsl(self, order):
-        order_detail = self.api.get_order_detail(self.coin, order['orderId'], order['clientOid'])
-        quote_volume, leverage, price_avg = float(order_detail['quoteVolume']), float(order_detail['leverage']), float(
-            order_detail['priceAvg'])
-        percent_pl = ((quote_volume / leverage) * 0.8 / leverage) / (quote_volume / leverage) * 100
-        percent_st = ((quote_volume / leverage) * 3 / leverage) / (quote_volume / leverage) * 100
-
-        if order_detail['posSide'] == 'short':
-            pl_size = price_avg * (1 - percent_pl / 100)
-            st_size = price_avg * (1 + percent_st / 100)
-        else:
-            pl_size = price_avg * (1 + percent_pl / 100)
-            st_size = price_avg * (1 - percent_st / 100)
-
-        self.api.place_take_profit(self.coin, self.hold_side, round(pl_size, 1))
-        self.api.place_stop_loss(self.coin, self.hold_side, round(st_size, 1))
 
     @staticmethod
     def select_coin(coin):
@@ -196,12 +169,14 @@ class DealFixMessage:
 
     def decide(self):
         deal_on_bitget = self.api.get_single_position(self.deal_on_db['coin'], self.deal_on_db['hold_side'])
-        if deal_on_bitget == 0:
+        if deal_on_bitget['exist'] == 0:
             db_manager.update_deal_status(self.deal_on_db['id'], 2)
-            print(f'SUCCESS - Close deal in DB on coin: {self.deal_on_db['coin']}')
+            print(f'SUCCESS - Close deal in DB on coin: {self.deal_on_db["coin"]}')
         else:
-            if self.api.close_positions(self.deal_on_db['coin'], self.deal_on_db['hold_side']):
-                print(f'SUCCESS - Close deal in BitGet on coin: {self.deal_on_db['coin']}')
-                db_manager.update_deal_status(self.deal_on_db['id'], 2)
-            else:
-                print(f'ERROR - Close deal in BitGet on coin: {self.deal_on_db['coin']}')
+            if deal_on_bitget['pnl'] > 0:
+                if self.api.close_positions(self.deal_on_db["coin"], self.deal_on_db["hold_side"]):
+                    print(f'SUCCESS - Close deal in BitGet on coin: {self.deal_on_db["coin"]}')
+                    db_manager.update_deal_status(self.deal_on_db["id"], 2)
+                else:
+                    print(f'ERROR - Close deal in BitGet on coin: {self.deal_on_db["coin"]}')
+            print(f'ERROR - PNL < 0 in BitGet on coin: {self.deal_on_db["coin"]}')
