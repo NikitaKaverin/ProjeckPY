@@ -23,7 +23,7 @@ tickers = api.get('/api/v2/mix/market/tickers', {
 })
 
 for ticker in tickers["data"]:
-    time.sleep(0.2)
+    time.sleep(0.1)
 
     coin = db_manager.select_coin(ticker["symbol"])
 
@@ -39,4 +39,4 @@ for ticker in tickers["data"]:
             db_manager.update_coin(ticker["symbol"], contract["data"][0]["maxLever"])
     else:
         db_manager.add_coin(ticker["symbol"], contract["data"][0]["maxLever"])
-    # print(ticker["symbol"], '-', contract["data"][0]["maxLever"], " - OK")
+    print(ticker["symbol"], '-', contract["data"][0]["maxLever"], " - OK")

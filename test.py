@@ -1,6 +1,8 @@
 from datetime import datetime as dt
 import os
 
+import telethon.utils
+
 import bitget.bitget_api as baseApi
 from bitget.exceptions import BitgetAPIException
 from dotenv import load_dotenv
@@ -23,13 +25,15 @@ client = TelegramClient('my_session', api_id, api_hash,
                         lang_code="en",
                         system_lang_code="en-US"
                         )
-peer_type = utils.resolve_id(-1001781065102)
+peer_type = utils.resolve_id(-4282973738)
+print(utils.get_peer_id(peer_type[0]))
 print(peer_type)
 
 
 async def main():
     # authentication
     await client.start(phone)
+    await client.send_message(telethon.types.PeerChat(4282973738), "hello")
 
     # get group and channel list
     dialogs = await client.get_dialogs()
