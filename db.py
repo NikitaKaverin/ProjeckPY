@@ -25,6 +25,14 @@ class DBManager:
         self.cursor.execute(query)
         return self.cursor.fetchone()
 
+    def update_coin(self, symbol, maxLever):
+        query = f'UPDATE Coins SET maxLever = {maxLever} WHERE name = "{symbol}"'
+        self.query_with_commit(query)
+
+    def add_coin(self, symbol, maxLever):
+        query = f'INSERT INTO Coins (name, maxLever) VALUES ("{symbol}", {maxLever})'
+        self.query_with_commit(query)
+
     def check_active_deal(self, coin, deal_type):
         query = f'SELECT COUNT(*) AS flag FROM Messages WHERE coin = "{coin}" AND deal_type = "{deal_type}" AND active = 1'
         self.cursor.execute(query)
@@ -75,5 +83,5 @@ class DBManager:
 
 if __name__ == '__main__':
     db = DBManager()
-    db.query("""DROP TABLE Messages""")
+    db.cursor.execute("""DROP TABLE Messages""")
     db.initDB()
