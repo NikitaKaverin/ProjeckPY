@@ -77,6 +77,7 @@ class DBManager:
         maxLever INTEGER
         )""")
 
+
     def close(self):
         self.connection.close()
 
