@@ -2,6 +2,7 @@ from datetime import datetime as dt
 import os
 
 import bitget.bitget_api as baseApi
+from bitget.exceptions import BitgetAPIException
 from dotenv import load_dotenv
 
 from db import DBManager
@@ -11,8 +12,12 @@ load_dotenv()
 apiKey = os.getenv('BITGET_API_KEY')
 secretKey = os.getenv('BITGET_SECRET_KEY')
 passphrase = os.getenv('BITGET_PASSPHRASE')
+marginDealPercentage = float(os.getenv('MARGIN_DEAL_PERCENTAGE'))
+takeProfitPercentage = float(os.getenv('TAKE_PROFIT_PERCENTAGE'))
+stopLossPercentage = float(os.getenv('STOP_LOSS_PERCENTAGE'))
 
-test = True
+
+test = False
 
 productType = "USDT-FUTURES"
 marginCoin = "USDT"
@@ -46,7 +51,7 @@ class MyAPI:
             'productType': productType,
             'marginCoin': marginCoin.lower()
         })['data']['available']
-        return float(available_balance) * 0.01
+        return float(available_balance) * marginDealPercentage
 
     def get_bid_price(self, coin):
         bid_price = self.api.get('/api/v2/mix/market/ticker', {
@@ -56,20 +61,31 @@ class MyAPI:
         return float(bid_price)
 
     def set_leverage(self, coin, max_lever, hold_side):
-        message_leverage = self.api.post('/api/v2/mix/account/set-leverage', {
-            'symbol': coin,
-            'productType': productType,
-            'marginCoin': marginCoin,
-            'leverage': max_lever,
-            'holdSide': str(hold_side)
-        })
+        try:
+            message_leverage = self.api.post('/api/v2/mix/account/set-leverage', {
+                'symbol': coin,
+                'productType': productType,
+                'marginCoin': marginCoin,
+                'leverage': max_lever,
+                'holdSide': str(hold_side)
+            })
+        except BitgetAPIException as e:
+            max_lever = e.message[-2:]
+            self.api.post('/api/v2/mix/account/set-leverage', {
+                'symbol': coin,
+                'productType': productType,
+                'marginCoin': marginCoin,
+                'leverage': int(max_lever),
+                'holdSide': str(hold_side)
+            })
+            return True
         return message_leverage['msg'] == 'success'
 
     def place_order(self, coin, size, deal_type, leverage, bid_price):
         client_oid = str(int(dt.timestamp(dt.now()) * 100000))
 
-        percent_pl = ((size / leverage) * 0.8 / leverage) / (size / leverage) * 100
-        percent_st = ((size / leverage) * 3 / leverage) / (size / leverage) * 100
+        percent_pl = ((size / leverage) * takeProfitPercentage / leverage) / (size / leverage) * 100
+        percent_st = ((size / leverage) * stopLossPercentage / leverage) / (size / leverage) * 100
 
         if deal_type.lower() == 'sell':
             pl_size = round(bid_price * (1 - percent_pl / 100), 1)
@@ -78,6 +94,7 @@ class MyAPI:
             pl_size = round(bid_price * (1 + percent_pl / 100), 1)
             st_size = round(bid_price * (1 - percent_st / 100), 1)
 
+        # Установить сделку
         res_post = self.api.post('/api/v2/mix/order/place-order', {
             "symbol": coin,
             "productType": productType,
@@ -97,8 +114,8 @@ class MyAPI:
         return None
 
     def close_positions(self, coin, hold_side):
+        # Закрывает позицию по рынку
         res_post = self.api.post('/api/v2/mix/order/close-positions', {
-            # Закрывает позицию по рынку
             "symbol": coin,
             "productType": productType,
             "holdSide": hold_side,
