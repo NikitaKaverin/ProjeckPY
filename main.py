@@ -23,10 +23,10 @@ passphrase = os.getenv('BITGET_PASSPHRASE')
 # chat_id = 1633253042
 
 # VIP
-# chat_id = 1781065102
+chat_id = 1781065102
 
 # TEST
-chat_id = 1489990553
+# chat_id = 1489990553
 
 # Check_Chat
 check_chat_id = 4282973738
